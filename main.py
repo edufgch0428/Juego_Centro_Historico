@@ -39,11 +39,11 @@ g.agregar_conexion("La Ronda", "Panecillo", 15)
 ##Se crea el jugador que empieza por la plaza grande
 jugador = Jugador(80, "Plaza Grande")
 
-### se crea el motor del juego, debe salir por el Panecillo con los 12 sitios visitados
-motor = Motor_Juego(g, jugador, "Panecillo", 12)
+### se crea el motor del juego, debe salir por el Panecillo con el numero n de sitios visitados
+motor = Motor_Juego(g, jugador, "Panecillo", len(g.sitios))
 
 # prueba rapida de movimiento
-print("Energía inicial:", jugador.energia)
+print("Energía inicial: " + str(jugador.energia))
 motor.intentar_mover("Catedral")
-print("Después de moverse a Catedral:", jugador.energia)
-print("Estado:", motor.verificar_estado())
+print("Después de moverse a Catedral: " + str(jugador.energia))
+print("Estado: " + str(motor.verificar_estado()))

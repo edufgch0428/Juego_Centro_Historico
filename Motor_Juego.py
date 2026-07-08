@@ -4,7 +4,7 @@ from Jugador import Jugador
 
 
 class Motor_Juego:
-    def _init_(self, grafo, jugador, sitio_salida, total_sitios):
+    def __init__(self, grafo, jugador, sitio_salida, total_sitios):
         self.grafo = grafo                             ##Mapa completo con sus conexiones
         self.jugador = jugador                         ##Jugador que se moviliza o realiza el recorrido
         self.sitio_salida = sitio_salida               ##Sitio donde termina el recorrido

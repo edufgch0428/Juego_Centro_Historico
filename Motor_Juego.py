@@ -65,7 +65,7 @@ def construir_juego():
     grafo.agregar_conexion("Plaza Grande", "Basílica", 8)
     grafo.agregar_conexion("La Ronda", "Panecillo", 15)
 
-    jugador = Jugador(80, "Plaza Grande")
+    jugador = Jugador(50, "Plaza Grande")
     motor = Motor_Juego(grafo, jugador, "Panecillo", len(grafo.sitios))
 
     return grafo, jugador, motor

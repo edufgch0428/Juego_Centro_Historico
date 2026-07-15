@@ -82,7 +82,7 @@ PERSONAJES = {
     "morado": "Explorador Morado",
 }
 
-POSICIONES = {
+POSICIONES = {                            ##Pixelees para ubicar los nodos en la pantalla
     "Panecillo":              (344, 90),
     "Museo de la Ciudad":     (534, 216),
     "Plaza Santo Domingo":    (154, 191),
@@ -185,7 +185,7 @@ def proceso_arbol(cola_pedidos, cola_respuestas):
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Quito Explorer")
+        self.root.title("QuiRuta")
         self.root.configure(bg=COLOR_FONDO_MENU)
         self.root.resizable(False, False)
 
@@ -242,7 +242,7 @@ class App:
         PantallaReglas(self.root, self)
 
     def iniciar_partida(self, nombre, personaje):
-        self.nombre_jugador = nombre if nombre.strip() else "Jugador"
+        self.nombre_jugador = nombre
         self.personaje = personaje
         self._limpiar_ventana()
         self.pantalla_juego = PantallaJuego(self.root, self)
@@ -266,7 +266,7 @@ class PantallaInicio:
         marco.pack(fill="both", expand=True)
         marco.pack_propagate(False)
 
-        tk.Label(marco, text="QUITO EXPLORER", font=("Georgia", 34, "bold"),
+        tk.Label(marco, text="QUIRUTA", font=("Georgia", 34, "bold"),
                  bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(70, 5))
         tk.Label(marco, text="Un recorrido por el Centro Historico de Quito",
                  font=("Georgia", 13, "italic"), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=(0, 50))
@@ -327,8 +327,11 @@ class PantallaIniciarJuego:
 
     def _comenzar(self):
         nombre = self.entrada_nombre.get().strip()
-        self.app.iniciar_partida(nombre, self.personaje_elegido.get())
+        if not nombre:  ##NUEVO: valida que no este vacio
+            messagebox.showwarning("Nombre requerido", "Por favor ingresa tu nombre antes de comenzar.")
+            return  ##corta aqui, no avanza a la partida
 
+        self.app.iniciar_partida(nombre, self.personaje_elegido.get())
 
 # ======================================================================
 # PANTALLA: INSIGNIAS COLECCIONADAS
@@ -349,7 +352,6 @@ class PantallaInsignias:
         tk.Label(fila_busqueda, text="Nombre del jugador:", font=("Georgia", 12),
                  bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(side="left", padx=5)
         self.entrada = tk.Entry(fila_busqueda, font=("Georgia", 12), width=20)
-        self.entrada.insert(0, app.nombre_jugador)
         self.entrada.pack(side="left", padx=5)
         tk.Button(fila_busqueda, text="Buscar", command=self._buscar, bg=COLOR_PANEL,
                   fg=COLOR_TEXTO, relief="flat", cursor="hand2").pack(side="left", padx=5)
@@ -359,9 +361,6 @@ class PantallaInsignias:
 
         tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
                   relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack(pady=10)
-
-        if app.nombre_jugador:
-            self._buscar()
 
     def _buscar(self):
         for w in self.lienzo_resultado.winfo_children():
@@ -550,6 +549,7 @@ class PantallaJuego:
 
         self.dibujar_conexiones()
         self.dibujar_nodos()
+        self.dibujar_bandera_meta()
         self.dibujar_jugador()
 
         self.root.after(100, self.revisar_colas)
@@ -797,11 +797,23 @@ class PantallaJuego:
         tk.Button(marco_botones, text="Sí", width=10, command=lambda: responder(True)).pack(side="left", padx=10)
         tk.Button(marco_botones, text="No", width=10, command=lambda: responder(False)).pack(side="left", padx=10)
 
+    def dibujar_bandera_meta(self):
+        #Dibuja una banderita sobre el nodo del Panecillo, para que el jugador identifique visualmente cual es el punto de llegada
+        x, y = POSICIONES["Panecillo"]
+        asta_x = x + 22
 
-# ======================================================================
+        ##el asta (palo) de la bandera
+        self.canvas.create_line(asta_x, y - 45, asta_x, y - 15, fill="#4A3418", width=2)
+
+        ##la tela triangular de la bandera
+        self.canvas.create_polygon(
+            asta_x, y - 45,
+                    asta_x + 16, y - 39,
+            asta_x, y - 33,
+            fill="#C0392B", outline="#4A3418"
+        )
+
 # ARRANQUE
-# ======================================================================
-
 def main():
     root = tk.Tk()
     App(root)

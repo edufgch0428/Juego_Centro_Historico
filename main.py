@@ -17,13 +17,58 @@ from tkinter import messagebox, ttk
 import multiprocessing as mp
 import queue
 import os
+import unicodedata
 
 from Motor_Juego import construir_juego
-from arbol import Evaluador_Trivia, BANCO_PREGUNTAS
+from arbol import Evaluador_Trivia, Arbol
 import persistencia
+
+# Pillow es opcional: si esta instalado, podemos cargar fotos reales en
+# formato .jpg/.jpeg (ademas de .png) y redimensionarlas. Si no esta
+# instalado en la maquina de algun companero, el juego sigue funcionando
+# normal, simplemente no se veran las fotos de los sitios.
+try:
+    from PIL import Image, ImageTk
+    PIL_DISPONIBLE = True
+except ImportError:
+    PIL_DISPONIBLE = False
 
 PUNTAJE_POR_RAREZA = {"común": 10, "rara": 25, "épica": 50, "legendaria": 100}
 CARPETA_ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+CARPETA_FOTOS = os.path.join(CARPETA_ASSETS, "lugares")
+TAMANO_FOTO = (460, 300)  # ancho, alto en pixeles dentro de la ventana emergente
+
+
+def _nombre_archivo_sitio(nombre_sitio):
+    """
+    Convierte "Plaza Grande" -> "plaza_grande", "Compañía" -> "compania".
+    Asi el nombre del archivo de imagen no depende de tildes ni mayusculas.
+    """
+    sin_tildes = unicodedata.normalize("NFKD", nombre_sitio)
+    sin_tildes = "".join(c for c in sin_tildes if not unicodedata.combining(c))
+    return sin_tildes.lower().replace(" ", "_")
+
+
+def cargar_foto_sitio(nombre_sitio, tamano=TAMANO_FOTO):
+    """
+    Busca en assets/lugares/ una imagen para este sitio (prueba varias
+    extensiones) y la devuelve ya lista para mostrar en un Label de
+    Tkinter. Si no encuentra nada, devuelve None (la pantalla que la usa
+    debe manejar ese caso mostrando un aviso en vez de la imagen).
+    """
+    base = _nombre_archivo_sitio(nombre_sitio)
+    for extension in (".jpg", ".jpeg", ".png"):
+        ruta = os.path.join(CARPETA_FOTOS, base + extension)
+        if not os.path.exists(ruta):
+            continue
+        if PIL_DISPONIBLE:
+            imagen = Image.open(ruta)
+            imagen = imagen.resize(tamano, Image.LANCZOS)
+            return ImageTk.PhotoImage(imagen)
+        elif extension == ".png":
+            # Sin Pillow, tkinter solo puede abrir .png directamente
+            return tk.PhotoImage(file=ruta)
+    return None
 
 COLOR_FONDO_MENU = "#2E2118"
 COLOR_PANEL = "#3C2A1E"
@@ -38,18 +83,18 @@ PERSONAJES = {
 }
 
 POSICIONES = {
-    "Plaza Grande":           (460, 540),
-    "Catedral":               (500, 480),
-    "Carondelet":             (400, 480),
-    "Compañía":               (520, 410),
-    "Plaza San Francisco":    (330, 420),
-    "Iglesia San Francisco":  (280, 360),
-    "La Ronda":               (330, 300),
-    "Museo de la Ciudad":     (420, 250),
-    "Plaza Santo Domingo":    (240, 230),
-    "Museo Casa de Sucre":    (200, 330),
-    "Basílica":               (560, 240),
-    "Panecillo":              (330, 150),
+    "Panecillo":              (344, 90),
+    "Museo de la Ciudad":     (534, 216),
+    "Plaza Santo Domingo":    (154, 191),
+    "Basílica":               (830, 203),
+    "La Ronda":               (344, 279),
+    "Museo Casa de Sucre":    (70, 317),
+    "Iglesia San Francisco":  (239, 355),
+    "Compañía":               (745, 418),
+    "Plaza San Francisco":    (344, 430),
+    "Carondelet":             (492, 506),
+    "Catedral":               (703, 506),
+    "Plaza Grande":           (619, 581),
 }
 
 CATEGORIA_SITIO = {
@@ -114,7 +159,8 @@ def proceso_grafo(cola_pedidos, cola_respuestas):
 
 
 def proceso_arbol(cola_pedidos, cola_respuestas):
-    evaluador = Evaluador_Trivia(BANCO_PREGUNTAS)
+    arbol = Arbol()
+    evaluador = Evaluador_Trivia(arbol)
     while True:
         pedido = cola_pedidos.get()
         if pedido == "FIN":
@@ -148,8 +194,24 @@ class App:
 
         self.nombre_jugador = ""
         self.personaje = "rojo"
+        self.pantalla_juego = None
+
+        self.root.protocol("WM_DELETE_WINDOW", self._al_cerrar_ventana)
 
         self.mostrar_pantalla_inicio()
+
+    def _al_cerrar_ventana(self):
+        """
+        Se ejecuta al presionar la X de la ventana. Si hay una partida en
+        curso, cierra sus procesos de grafo/arbol antes de salir, para no
+        dejar procesos de Python huerfanos corriendo en segundo plano.
+        """
+        if self.pantalla_juego is not None:
+            try:
+                self.pantalla_juego._cerrar_procesos()
+            except Exception:
+                pass
+        self.root.destroy()
 
     def _cargar_imagenes_comunes(self):
         for clave in PERSONAJES:
@@ -188,6 +250,7 @@ class App:
     def terminar_partida(self, puntaje, resultado, cantidad_visitados, insignias_ganadas):
         persistencia.guardar_partida(self.nombre_jugador, self.personaje, puntaje, resultado, cantidad_visitados)
         persistencia.agregar_insignias(self.nombre_jugador, insignias_ganadas)
+        self.pantalla_juego = None
         self._limpiar_ventana()
         PantallaFin(self.root, self, puntaje, resultado, insignias_ganadas)
 
@@ -470,6 +533,10 @@ class PantallaJuego:
                                        font=("Georgia", 14, "bold"), bg=COLOR_PANEL, fg=COLOR_TEXTO)
         self.label_puntaje.pack(side="left", padx=25, pady=8)
 
+        tk.Button(barra, text="Salir del juego", font=("Georgia", 11, "bold"),
+                  bg="#C0392B", fg="white", activebackground="#A5281B", relief="flat",
+                  cursor="hand2", command=self.confirmar_salida).pack(side="right", padx=20, pady=8)
+
         self.imagenes = dict(app.imagenes)  # ya trae los pines cargados
         self.imagenes["fondo"] = tk.PhotoImage(file=os.path.join(CARPETA_ASSETS, "fondo_mapa.png"))
         for categoria in ["plazas", "iglesias", "cultura", "museos", "miradores"]:
@@ -507,15 +574,22 @@ class PantallaJuego:
             self.canvas.tag_bind(icono, "<Button-1>", lambda e, n=nombre: self.click_nodo(n))
             self.iconos_nodo[nombre] = icono
 
-            ancho_fondo = 9 * len(nombre) * 0.62 + 12
-            self.canvas.create_rectangle(x - ancho_fondo/2, y - 42, x + ancho_fondo/2, y - 25,
-                                          fill="#FFF7E3", outline="")
-            self.canvas.create_text(x, y - 33, text=nombre, font=("Georgia", 8, "bold"), fill="#4A3418")
+            # Primero se dibuja el TEXTO, y despues se mide su tamaño real
+            # con bbox() -- asi el fondito siempre le queda del tamaño
+            # exacto, sin adivinar con una formula (eso era lo que
+            # causaba que nombres largos como "Iglesia San Francisco"
+            # se cortaran antes).
+            texto_id = self.canvas.create_text(x, y - 33, text=nombre, font=("Georgia", 8, "bold"), fill="#4A3418")
+            x0, y0, x1, y1 = self.canvas.bbox(texto_id)
+            margen = 5
+            fondo_id = self.canvas.create_rectangle(x0 - margen, y0 - 2, x1 + margen, y1 + 2,
+                                                      fill="#FFF7E3", outline="")
+            self.canvas.tag_lower(fondo_id, texto_id)  # el fondo va DETRAS del texto
 
     def dibujar_jugador(self):
         x, y = POSICIONES[self.nodo_actual]
         clave_pin = "pin_" + self.app.personaje
-        self.jugador_id = self.canvas.create_image(x, y - 18, anchor="s", image=self.imagenes[clave_pin])
+        self.jugador_id = self.canvas.create_image(x, y - 13, anchor="s", image=self.imagenes[clave_pin])
 
     def actualizar_colores_nodos(self):
         for nombre, icono in self.iconos_nodo.items():
@@ -532,7 +606,7 @@ class PantallaJuego:
         self.animando = True
         t = paso_actual / pasos
         x = origen[0] + (destino[0] - origen[0]) * t
-        y = (origen[1] + (destino[1] - origen[1]) * t) - 18
+        y = (origen[1] + (destino[1] - origen[1]) * t) - 13
         self.canvas.coords(self.jugador_id, x, y)
 
         if paso_actual >= pasos:
@@ -612,6 +686,25 @@ class PantallaJuego:
         self.p_grafo.join()
         self.p_arbol.join()
 
+    # ---------------- SALIR DEL JUEGO ----------------
+    def confirmar_salida(self):
+        """Pide confirmacion antes de abandonar la partida en curso."""
+        seguro = messagebox.askyesno(
+            "Salir del juego",
+            "¿Seguro que quieres salir?\nSe perderá el progreso de esta partida.",
+        )
+        if not seguro:
+            return
+        self._cerrar_procesos()
+        # Guardamos la partida como abandonada para que quede registro,
+        # igual que una victoria o derrota, pero sin insignias nuevas.
+        persistencia.guardar_partida(
+            self.app.nombre_jugador, self.app.personaje, self.puntaje_total,
+            "abandonada", len(self.visitados),
+        )
+        self.app.pantalla_juego = None
+        self.app.mostrar_pantalla_inicio()
+
     # ---------------- RESPUESTAS DEL ARBOL ----------------
     def manejar_respuesta_arbol(self, mensaje):
         if mensaje["tipo"] == "pregunta":
@@ -624,14 +717,68 @@ class PantallaJuego:
             if resultado["insignia"]:
                 self.insignias_ganadas.append(resultado["insignia"])
 
-            texto = "Resultado: " + resultado["resultado"] + "\n"
-            if resultado["insignia"]:
-                texto += "Insignia obtenida: " + resultado["insignia"]["nombre"] + " (" + resultado["insignia"]["rareza"] + ")"
-            else:
-                texto += "No obtuviste insignia."
-            messagebox.showinfo("Resultado de la trivia", texto)
+            self.mostrar_resultado_con_foto(self.sitio_en_pregunta, resultado)
 
+    # ---------------- VENTANA: RESULTADO DE LA TRIVIA + FOTO DEL SITIO ----------------
+    def mostrar_resultado_con_foto(self, nombre_sitio, resultado):
+        """
+        Muestra el resultado de la trivia (acierto/error + insignia) junto
+        con una foto real del sitio que se acaba de visitar. El juego
+        queda "en pausa" -- no se descuenta/suma energia ni se revisa
+        victoria/derrota -- hasta que el jugador presiona "Continuar".
+        """
+        acierto = resultado["resultado"] == "correcta"
+
+        ventana = tk.Toplevel(self.root)
+        ventana.title(nombre_sitio)
+        ventana.configure(bg=COLOR_PANEL)
+        ventana.resizable(False, False)
+        ventana.transient(self.root)   # se queda por encima de la ventana principal
+        ventana.grab_set()             # bloquea clics en el mapa mientras esta abierta
+
+        tk.Label(ventana, text=nombre_sitio, font=("Georgia", 16, "bold"),
+                 bg=COLOR_PANEL, fg=COLOR_ACENTO).pack(pady=(15, 5))
+
+        # --- Foto del sitio (o aviso si todavia no se ha agregado) ---
+        foto = cargar_foto_sitio(nombre_sitio)
+        if foto is not None:
+            self._foto_actual = foto  # referencia viva para que no la borre el garbage collector
+            tk.Label(ventana, image=foto, bg=COLOR_PANEL).pack(padx=15, pady=5)
+        else:
+            marco_sin_foto = tk.Frame(ventana, bg="#2A1D14", width=TAMANO_FOTO[0], height=TAMANO_FOTO[1])
+            marco_sin_foto.pack(padx=15, pady=5)
+            marco_sin_foto.pack_propagate(False)
+            tk.Label(marco_sin_foto, text="(Foto del sitio no disponible todavía)",
+                     font=("Georgia", 10, "italic"), bg="#2A1D14", fg=COLOR_TEXTO).pack(expand=True)
+
+        # --- Texto del resultado ---
+        color_resultado = "#5CB85C" if acierto else "#C0392B"
+        texto_resultado = "¡Respuesta correcta!" if acierto else "Respuesta incorrecta"
+        tk.Label(ventana, text=texto_resultado, font=("Georgia", 13, "bold"),
+                 bg=COLOR_PANEL, fg=color_resultado).pack(pady=(10, 0))
+
+        signo = "+" if resultado["energia"] >= 0 else ""
+        tk.Label(ventana, text=f"Energía: {signo}{resultado['energia']}", font=("Georgia", 11),
+                 bg=COLOR_PANEL, fg=COLOR_TEXTO).pack()
+
+        if resultado["insignia"]:
+            tk.Label(ventana,
+                     text=f"Insignia obtenida: {resultado['insignia']['nombre']} ({resultado['insignia']['rareza']})",
+                     font=("Georgia", 11, "bold"), bg=COLOR_PANEL, fg=COLOR_ACENTO).pack(pady=(2, 0))
+        else:
+            tk.Label(ventana, text="No obtuviste insignia esta vez.", font=("Georgia", 10, "italic"),
+                     bg=COLOR_PANEL, fg=COLOR_TEXTO).pack(pady=(2, 0))
+
+        def continuar():
+            ventana.destroy()
             self.cola_pedido_grafo.put({"tipo": "sumar_energia", "cantidad": resultado["energia"]})
+
+        tk.Button(ventana, text="Continuar recorrido", font=("Georgia", 12, "bold"),
+                  bg=COLOR_ACENTO, fg="#2E2118", relief="flat", cursor="hand2",
+                  command=continuar).pack(pady=15)
+
+        # Si cierran la ventana con la X, se comporta igual que "Continuar"
+        ventana.protocol("WM_DELETE_WINDOW", continuar)
 
     def mostrar_ventana_pregunta(self, texto_pregunta):
         ventana = tk.Toplevel(self.root)
@@ -646,7 +793,7 @@ class PantallaJuego:
             self.cola_pedido_arbol.put({"tipo": "evaluar", "sitio": self.sitio_en_pregunta, "respuesta": valor_bool})
 
         marco_botones = tk.Frame(ventana, bg=COLOR_PANEL)
-        marco_botones.pack(pady=10)
+        marco_botones.pack(pady=10) 
         tk.Button(marco_botones, text="Sí", width=10, command=lambda: responder(True)).pack(side="left", padx=10)
         tk.Button(marco_botones, text="No", width=10, command=lambda: responder(False)).pack(side="left", padx=10)
 

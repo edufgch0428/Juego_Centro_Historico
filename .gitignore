@@ -1,3 +1,15 @@
-.idea/
+# --- Datos personales de cada partida (no deben compartirse por Git) ---
+# Cada quien que corra el juego genera su propio historial e insignias
+# en su computadora. Si se suben, cada commit pisaria el historial del
+# companero anterior.
+historial.json
+insignias_jugadores.json
+ 
+# --- Python / entorno virtual ---
 __pycache__/
 *.pyc
+.venv/
+ 
+# --- PyCharm ---
+.idea/
+ 

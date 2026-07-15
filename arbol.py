@@ -1,9 +1,10 @@
 ##Clase que representa un nodo del árbol de categorías (puede ser categoría o sitio-hoja)
 class NodoCategoria:
-    def __init__(self, nombre, es_hoja=False):
+    def __init__(self, nombre, es_hoja=False, datos=None):
         self.nombre = nombre                      ##Nombre de la categoría o del sitio
         self.es_hoja = es_hoja                     ##True si es un sitio turístico, False si es categoría
         self.hijos = []                            ##Lista de nodos hijos (subcategorías o sitios)
+        self.datos = datos                         ##Solo las hojas usan esto: pregunta, respuesta, insignia, etc.
 
     def agregar_hijo(self, nodo):
         self.hijos.append(nodo)                    ##Agrega una categoría o un sitio como hijo
@@ -36,7 +37,10 @@ class Arbol:
         for nombre_categoria, sitios in categorias.items():
             nodo_categoria = NodoCategoria(nombre_categoria)    ##Se crea la categoría
             for nombre_sitio in sitios:
-                nodo_categoria.agregar_hijo(NodoCategoria(nombre_sitio, es_hoja=True))   ##Se agrega cada sitio como hoja
+                ##Cada hoja se crea CON sus datos de trivia ya adentro (tomados
+                ##de BANCO_PREGUNTAS, que se define mas abajo en este archivo).
+                datos_sitio = BANCO_PREGUNTAS.get(nombre_sitio)
+                nodo_categoria.agregar_hijo(NodoCategoria(nombre_sitio, es_hoja=True, datos=datos_sitio))
             self.raiz.agregar_hijo(nodo_categoria)
 
     def buscar_sitio(self, nombre_sitio):
@@ -127,16 +131,22 @@ BANCO_PREGUNTAS = {
 
 ##Clase que evalúa las respuestas de trivia y calcula la energía/insignia resultante
 class Evaluador_Trivia:
-    def __init__(self, banco_preguntas):
-        self.banco_preguntas = banco_preguntas
+    def __init__(self, arbol):
+        self.arbol = arbol   ##Recibe el ARBOL real (instancia de Arbol), no el diccionario plano
+
+    def _datos_del_sitio(self, nombre_sitio):
+        ##Recorre el arbol (busqueda recursiva DFS) para encontrar la hoja
+        ##correspondiente a este sitio, y devuelve sus datos de trivia.
+        nodo = self.arbol.buscar_sitio(nombre_sitio)
+        return nodo.datos if nodo else None
 
     def obtener_pregunta(self, nombre_sitio):
-        datos = self.banco_preguntas.get(nombre_sitio)
+        datos = self._datos_del_sitio(nombre_sitio)
         return datos["pregunta"] if datos else None      ##Devuelve el texto de la pregunta para mostrarla en la interfaz
 
     def evaluar(self, nombre_sitio, respuesta_jugador):
         ##respuesta_jugador puede ser bool (True/False) o string "si"/"no"
-        datos = self.banco_preguntas.get(nombre_sitio)
+        datos = self._datos_del_sitio(nombre_sitio)
         if not datos:
             return {"energia": 0, "insignia": None, "resultado": "sitio no encontrado"}
 

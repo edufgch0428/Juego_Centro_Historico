@@ -39,12 +39,12 @@ class TestArbolEstructura(unittest.TestCase):
             with self.subTest(categoria=categoria.nombre):
                 self.assertEqual(len(categoria.hijos), categorias_esperadas[categoria.nombre])
 
-    def test_nodos_hoja_no_traen_datos_de_trivia(self):
-        # OJO: en la versión actual, NodoCategoria NO carga datos_trivia.
-        # Esta prueba documenta que el árbol es puramente estructural
-        # y que la trivia se consulta aparte, en BANCO_PREGUNTAS.
+    def test_nodos_hoja_traen_datos_de_trivia(self):
+        # Las hojas cargan sus datos de trivia (pregunta, respuesta, insignia)
+        # directo desde BANCO_PREGUNTAS, en el atributo "datos".
         nodo = self.arbol.buscar_sitio("Catedral")
-        self.assertFalse(hasattr(nodo, "datos_trivia"))
+        self.assertIsNotNone(nodo.datos)
+        self.assertIn("pregunta", nodo.datos)
 
 
 class TestBancoPreguntasSincronizado(unittest.TestCase):
@@ -79,10 +79,11 @@ class TestBancoPreguntasSincronizado(unittest.TestCase):
 
 class TestEvaluadorTrivia(unittest.TestCase):
     """Pruebas sobre Evaluador_Trivia, tal como está implementado ahora:
-    recibe el diccionario BANCO_PREGUNTAS directo, NO el Arbol."""
+    recibe un objeto Arbol, no el diccionario BANCO_PREGUNTAS directo."""
 
     def setUp(self):
-        self.evaluador = Evaluador_Trivia(BANCO_PREGUNTAS)
+        self.arbol = Arbol()
+        self.evaluador = Evaluador_Trivia(self.arbol)
 
     def test_obtener_pregunta_existe(self):
         pregunta = self.evaluador.obtener_pregunta("Catedral")
@@ -149,7 +150,8 @@ class TestIntegracionConJugador(unittest.TestCase):
     """Pruebas de aplicar_a_jugador, tal como lo llamaría Motor_Juego/main.py."""
 
     def setUp(self):
-        self.evaluador = Evaluador_Trivia(BANCO_PREGUNTAS)
+        self.arbol = Arbol()
+        self.evaluador = Evaluador_Trivia(self.arbol)
         self.jugador = JugadorFalso(energia_inicial=80)
 
     def test_energia_sube_con_respuesta_correcta(self):
@@ -164,22 +166,6 @@ class TestIntegracionConJugador(unittest.TestCase):
         jugador_debil = JugadorFalso(energia_inicial=2)
         self.evaluador.aplicar_a_jugador(jugador_debil, "Catedral", True)  # incorrecta, -4
         self.assertEqual(jugador_debil.energia, -2)
-
-
-class TestArbolNoConectadoAlJuego(unittest.TestCase):
-    """Prueba de advertencia: documenta que el Arbol NO se usa en tiempo de ejecución
-    dentro de main.py, tal como está el código ahora. Si esta prueba falla en el futuro,
-    significa que alguien ya conectó Arbol con Evaluador_Trivia -- ¡buena señal!"""
-
-    def test_evaluador_trivia_no_requiere_instancia_de_arbol(self):
-        # Evaluador_Trivia se puede construir sin ningún Arbol, prueba de que
-        # actualmente no depende de la clase Arbol para funcionar.
-        evaluador = Evaluador_Trivia(BANCO_PREGUNTAS)
-        resultado = evaluador.evaluar("Catedral", False)
-        self.assertEqual(resultado["resultado"], "correcta")
-        # Si en el futuro Evaluador_Trivia requiere un Arbol en el constructor,
-        # esta línea empezará a fallar con TypeError, avisando que hay que
-        # actualizar esta prueba junto con el resto del proyecto.
 
 
 if __name__ == "__main__":

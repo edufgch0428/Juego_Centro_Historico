@@ -81,3 +81,7 @@ def agregar_insignias(nombre, insignias_nuevas):
             nombres_actuales.add(insignia["nombre"])
     todas[nombre] = actuales
     _escribir_json(RUTA_INSIGNIAS, todas)
+
+def cargar_mejores_partidas(cantidad=5):
+    historial = _leer_json(RUTA_HISTORIAL, [])
+    return sorted(historial, key=lambda partida: partida["puntaje"], reverse=True)[:cantidad]

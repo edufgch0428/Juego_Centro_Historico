@@ -399,27 +399,55 @@ class PantallaHistorial:
         marco.pack(fill="both", expand=True)
         marco.pack_propagate(False)
 
-        tk.Label(marco, text="Historial de Juego", font=("Georgia", 24, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(30, 15))
+        tk.Label(marco, text="Top 5 Mejores Puntajes", font=("Georgia", 22, "bold"),
+                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(15, 10))
 
-        columnas = ("nombre", "personaje", "puntaje", "resultado", "sitios", "fecha")
-        tabla = ttk.Treeview(marco, columns=columnas, show="headings", height=16)
-        encabezados = {"nombre": "Nombre", "personaje": "Personaje", "puntaje": "Puntaje",
+        estilo = ttk.Style()
+        estilo.theme_use("clam")
+        estilo.configure("Historial.Treeview",
+                          background=COLOR_PANEL, foreground=COLOR_TEXTO,
+                          fieldbackground=COLOR_PANEL, rowheight=42,
+                          font=("Georgia", 12), borderwidth=0)
+        estilo.configure("Historial.Treeview.Heading",
+                          background=COLOR_ACENTO, foreground=COLOR_FONDO_MENU,
+                          font=("Georgia", 13, "bold"), borderwidth=0)
+        estilo.map("Historial.Treeview", background=[("selected", COLOR_ACENTO)],
+                   foreground=[("selected", COLOR_FONDO_MENU)])
+
+        columnas = ("puesto", "nombre", "personaje", "puntaje", "resultado", "sitios", "fecha")
+        tabla = ttk.Treeview(marco, columns=columnas, show="headings",
+                              style="Historial.Treeview", height=5)
+        encabezados = {"puesto": "#", "nombre": "Nombre", "personaje": "Personaje", "puntaje": "Puntaje",
                         "resultado": "Resultado", "sitios": "Sitios visitados", "fecha": "Fecha"}
+        anchos = {"puesto": 45, "nombre": 130, "personaje": 150, "puntaje": 100,
+                  "resultado": 120, "sitios": 130, "fecha": 150}
         for col in columnas:
             tabla.heading(col, text=encabezados[col])
-            tabla.column(col, width=130, anchor="center")
+            tabla.column(col, width=anchos[col], anchor="center")
 
-        for partida in persistencia.cargar_historial():
-            tabla.insert("", "end", values=(
-                partida["nombre"], PERSONAJES.get(partida["personaje"], partida["personaje"]),
-                partida["puntaje"], partida["resultado"], partida["sitios_visitados"], partida["fecha"]))
+        tabla.tag_configure("oro", foreground="#FFD966")
+        tabla.tag_configure("plata", foreground="#D9D9D9")
+        tabla.tag_configure("bronce", foreground="#D08A4C")
+        tabla.tag_configure("normal", foreground=COLOR_TEXTO)
 
-        tabla.pack(padx=20, pady=5, fill="both", expand=True)
+        medallas = {0: "🥇", 1: "🥈", 2: "🥉"}
+        etiquetas = {0: "oro", 1: "plata", 2: "bronce"}
+
+        mejores = persistencia.cargar_mejores_partidas(5)
+        if not mejores:
+            tk.Label(marco, text="Aún no hay partidas registradas.", font=("Georgia", 13, "italic"),
+                     bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=40)
+        else:
+            for i, partida in enumerate(mejores):
+                puesto = medallas.get(i, str(i + 1))
+                tabla.insert("", "end", tags=(etiquetas.get(i, "normal"),), values=(
+                    puesto, partida["nombre"], PERSONAJES.get(partida["personaje"], partida["personaje"]),
+                    partida["puntaje"], partida["resultado"], partida["sitios_visitados"], partida["fecha"]))
+
+        tabla.pack(padx=15, pady=10, fill="both", expand=True)
 
         tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
                   relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack(pady=10)
-
 
 # ======================================================================
 # PANTALLA: REGLAS
@@ -510,7 +538,7 @@ class PantallaJuego:
         self.p_arbol.start()
 
         self.nodo_actual = "Plaza Grande"
-        self.energia = 80
+        self.energia = 50
         self.visitados = {self.nodo_actual}
         self.puntaje_total = 0
         self.sitio_en_pregunta = None

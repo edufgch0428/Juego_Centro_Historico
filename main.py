@@ -70,10 +70,10 @@ def cargar_foto_sitio(nombre_sitio, tamano=TAMANO_FOTO):
             return tk.PhotoImage(file=ruta)
     return None
 
-COLOR_FONDO_MENU = "#2E2118"
-COLOR_PANEL = "#3C2A1E"
-COLOR_TEXTO = "#F4E3C1"
-COLOR_ACENTO = "#E7B93A"
+COLOR_FONDO_MENU = "#1E4FA3"
+COLOR_PANEL = "#123166"
+COLOR_TEXTO = "#FFF6E0"
+COLOR_ACENTO = "#FFC700"
 
 PERSONAJES = {
     "rojo":   "Exploradora Roja",
@@ -83,18 +83,18 @@ PERSONAJES = {
 }
 
 POSICIONES = {                            ##Pixelees para ubicar los nodos en la pantalla
-    "Panecillo":              (344, 90),
-    "Museo de la Ciudad":     (534, 216),
-    "Plaza Santo Domingo":    (154, 191),
-    "Basílica":               (830, 203),
-    "La Ronda":               (344, 279),
-    "Museo Casa de Sucre":    (70, 317),
-    "Iglesia San Francisco":  (239, 355),
-    "Compañía":               (745, 418),
-    "Plaza San Francisco":    (344, 430),
-    "Carondelet":             (492, 506),
-    "Catedral":               (703, 506),
-    "Plaza Grande":           (619, 581),
+    "Panecillo":              (355, 75),
+    "Basílica":               (690, 130),
+    "Museo de la Ciudad":     (555, 205),
+    "Plaza Santo Domingo":    (140, 175),
+    "La Ronda":               (375, 270),
+    "Museo Casa de Sucre":    (65, 300),
+    "Iglesia San Francisco":  (225, 400),
+    "Compañía":               (780, 335),
+    "Plaza San Francisco":    (395, 450),
+    "Carondelet":             (515, 510),
+    "Catedral":               (780, 510),
+    "Plaza Grande":           (625, 563),
 }
 
 CATEGORIA_SITIO = {
@@ -319,7 +319,7 @@ class PantallaIniciarJuego:
             tk.Label(sub, text=etiqueta, font=("Georgia", 9), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack()
 
         tk.Button(marco, text="Comenzar Recorrido", font=("Georgia", 14, "bold"), width=22,
-                  bg=COLOR_ACENTO, fg="#2E2118", relief="flat", cursor="hand2",
+                  bg=COLOR_ACENTO, fg="#123166", relief="flat", cursor="hand2",
                   command=self._comenzar).pack(pady=40)
 
         tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
@@ -374,7 +374,7 @@ class PantallaInsignias:
                      font=("Georgia", 12, "italic"), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=20)
             return
 
-        colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": "#E7B93A"}
+        colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": COLOR_ACENTO}
         contenedor = tk.Frame(self.lienzo_resultado, bg=COLOR_FONDO_MENU)
         contenedor.pack()
         for i, ins in enumerate(insignias):
@@ -485,7 +485,7 @@ class PantallaFin:
         marco.pack_propagate(False)
 
         titulo = "Recorriste todo el Centro Historico!" if gano else "Te quedaste sin energia"
-        color_titulo = COLOR_ACENTO if gano else "#C0392B"
+        color_titulo = COLOR_ACENTO if gano else "#E63946"
         tk.Label(marco, text=titulo, font=("Georgia", 22, "bold"), bg=COLOR_FONDO_MENU,
                  fg=color_titulo, wraplength=700).pack(pady=(50, 10))
 
@@ -495,7 +495,7 @@ class PantallaFin:
         if insignias:
             tk.Label(marco, text="Insignias ganadas en esta partida:", font=("Georgia", 12, "italic"),
                      bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=(20, 5))
-            colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": "#E7B93A"}
+            colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": COLOR_ACENTO}
             contenedor = tk.Frame(marco, bg=COLOR_FONDO_MENU)
             contenedor.pack(pady=5)
             for i, ins in enumerate(insignias):
@@ -512,7 +512,7 @@ class PantallaFin:
         marco_botones = tk.Frame(marco, bg=COLOR_FONDO_MENU)
         marco_botones.pack(pady=40)
         tk.Button(marco_botones, text="Jugar de nuevo", font=("Georgia", 13, "bold"), width=16,
-                  bg=COLOR_ACENTO, fg="#2E2118", relief="flat", cursor="hand2",
+                  bg=COLOR_ACENTO, fg="#123166", relief="flat", cursor="hand2",
                   command=lambda: app.iniciar_partida(app.nombre_jugador, app.personaje)).pack(side="left", padx=10)
         tk.Button(marco_botones, text="Volver al menu", font=("Georgia", 13, "bold"), width=16,
                   bg=COLOR_PANEL, fg=COLOR_TEXTO, relief="flat", cursor="hand2",
@@ -561,7 +561,7 @@ class PantallaJuego:
         self.label_puntaje.pack(side="left", padx=25, pady=8)
 
         tk.Button(barra, text="Salir del juego", font=("Georgia", 11, "bold"),
-                  bg="#C0392B", fg="white", activebackground="#A5281B", relief="flat",
+                  bg="#E63946", fg="white", activebackground="#C42A38", relief="flat",
                   cursor="hand2", command=self.confirmar_salida).pack(side="right", padx=20, pady=8)
 
         self.imagenes = dict(app.imagenes)  # ya trae los pines cargados
@@ -590,12 +590,14 @@ class PantallaJuego:
             self.canvas.create_line(x1, y1, x2, y2, fill="#8B5E3C", width=5, capstyle="round")
 
     def _nombre_imagen(self, nombre_sitio):
-        categoria = CATEGORIA_SITIO[nombre_sitio].lower()
-        sufijo = "_visitado" if nombre_sitio in self.visitados else ""
-        return categoria + sufijo
+        # El icono SIEMPRE muestra el color de su categoria; lo visitado
+        # se marca aparte con una insignia (ver _dibujar_insignia_visitado),
+        # para no confundirse con categorias que ya son doradas (Plazas).
+        return CATEGORIA_SITIO[nombre_sitio].lower()
 
     def dibujar_nodos(self):
         self.iconos_nodo = {}
+        self.insignias_visitado = {}
         for nombre, (x, y) in POSICIONES.items():
             clave_imagen = self._nombre_imagen(nombre)
             icono = self.canvas.create_image(x, y, image=self.imagenes[clave_imagen])
@@ -614,14 +616,29 @@ class PantallaJuego:
                                                       fill="#FFF7E3", outline="")
             self.canvas.tag_lower(fondo_id, texto_id)  # el fondo va DETRAS del texto
 
+            if nombre in self.visitados:
+                self._dibujar_insignia_visitado(nombre, x, y)
+
+    def _dibujar_insignia_visitado(self, nombre, x, y):
+        """Circulo verde con un check (✓) en la esquina superior derecha
+        del icono, para marcar 'ya visitado' sin depender de ningun color
+        que ya este en uso por alguna categoria."""
+        bx, by = x + 20, y - 20
+        circulo = self.canvas.create_oval(bx - 10, by - 10, bx + 10, by + 10,
+                                           fill="#2E9E4F", outline="#FFFFFF", width=2)
+        check = self.canvas.create_text(bx, by, text="✓", font=("Georgia", 10, "bold"), fill="white")
+        self.insignias_visitado[nombre] = (circulo, check)
+
     def dibujar_jugador(self):
         x, y = POSICIONES[self.nodo_actual]
         clave_pin = "pin_" + self.app.personaje
         self.jugador_id = self.canvas.create_image(x, y - 13, anchor="s", image=self.imagenes[clave_pin])
 
     def actualizar_colores_nodos(self):
-        for nombre, icono in self.iconos_nodo.items():
-            self.canvas.itemconfig(icono, image=self.imagenes[self._nombre_imagen(nombre)])
+        for nombre in self.visitados:
+            if nombre not in self.insignias_visitado:
+                x, y = POSICIONES[nombre]
+                self._dibujar_insignia_visitado(nombre, x, y)
 
     # ---------------- MOVIMIENTO ANIMADO ----------------
     def animar_jugador(self, origen, destino, al_terminar, pasos=18, paso_actual=0):
@@ -773,14 +790,14 @@ class PantallaJuego:
             self._foto_actual = foto  # referencia viva para que no la borre el garbage collector
             tk.Label(ventana, image=foto, bg=COLOR_PANEL).pack(padx=15, pady=5)
         else:
-            marco_sin_foto = tk.Frame(ventana, bg="#2A1D14", width=TAMANO_FOTO[0], height=TAMANO_FOTO[1])
+            marco_sin_foto = tk.Frame(ventana, bg="#0F1A2E", width=TAMANO_FOTO[0], height=TAMANO_FOTO[1])
             marco_sin_foto.pack(padx=15, pady=5)
             marco_sin_foto.pack_propagate(False)
             tk.Label(marco_sin_foto, text="(Foto del sitio no disponible todavía)",
-                     font=("Georgia", 10, "italic"), bg="#2A1D14", fg=COLOR_TEXTO).pack(expand=True)
+                     font=("Georgia", 10, "italic"), bg="#0F1A2E", fg=COLOR_TEXTO).pack(expand=True)
 
         # --- Texto del resultado ---
-        color_resultado = "#5CB85C" if acierto else "#C0392B"
+        color_resultado = "#5CB85C" if acierto else "#E63946"
         texto_resultado = "¡Respuesta correcta!" if acierto else "Respuesta incorrecta"
         tk.Label(ventana, text=texto_resultado, font=("Georgia", 13, "bold"),
                  bg=COLOR_PANEL, fg=color_resultado).pack(pady=(10, 0))
@@ -802,7 +819,7 @@ class PantallaJuego:
             self.cola_pedido_grafo.put({"tipo": "sumar_energia", "cantidad": resultado["energia"]})
 
         tk.Button(ventana, text="Continuar recorrido", font=("Georgia", 12, "bold"),
-                  bg=COLOR_ACENTO, fg="#2E2118", relief="flat", cursor="hand2",
+                  bg=COLOR_ACENTO, fg="#123166", relief="flat", cursor="hand2",
                   command=continuar).pack(pady=15)
 
         # Si cierran la ventana con la X, se comporta igual que "Continuar"
@@ -821,7 +838,7 @@ class PantallaJuego:
             self.cola_pedido_arbol.put({"tipo": "evaluar", "sitio": self.sitio_en_pregunta, "respuesta": valor_bool})
 
         marco_botones = tk.Frame(ventana, bg=COLOR_PANEL)
-        marco_botones.pack(pady=10) 
+        marco_botones.pack(pady=10)
         tk.Button(marco_botones, text="Sí", width=10, command=lambda: responder(True)).pack(side="left", padx=10)
         tk.Button(marco_botones, text="No", width=10, command=lambda: responder(False)).pack(side="left", padx=10)
 
@@ -838,7 +855,7 @@ class PantallaJuego:
             asta_x, y - 45,
                     asta_x + 16, y - 39,
             asta_x, y - 33,
-            fill="#C0392B", outline="#4A3418"
+            fill="#E63946", outline="#4A3418"
         )
 
 # ARRANQUE

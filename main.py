@@ -88,7 +88,7 @@ POSICIONES = {                            ##Pixelees para ubicar los nodos en la
     "Museo de la Ciudad":     (555, 205),
     "Plaza Santo Domingo":    (140, 175),
     "La Ronda":               (375, 270),
-    "Museo Casa de Sucre":    (65, 300),
+    "Museo Casa de Sucre":    (115, 300),
     "Iglesia San Francisco":  (225, 400),
     "Compañía":               (780, 335),
     "Plaza San Francisco":    (395, 450),

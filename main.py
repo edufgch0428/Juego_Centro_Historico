@@ -38,7 +38,6 @@ CARPETA_ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "asset
 CARPETA_FOTOS = os.path.join(CARPETA_ASSETS, "lugares")
 TAMANO_FOTO = (460, 300)  # ancho, alto en pixeles dentro de la ventana emergente
 
-
 def _nombre_archivo_sitio(nombre_sitio):
     """
     Convierte "Plaza Grande" -> "plaza_grande", "Compañía" -> "compania".
@@ -70,10 +69,37 @@ def cargar_foto_sitio(nombre_sitio, tamano=TAMANO_FOTO):
             return tk.PhotoImage(file=ruta)
     return None
 
+# --- NUEVO: carga de iconos de insignias, mismo patron que cargar_foto_sitio ---
+CARPETA_INSIGNIAS = os.path.join(CARPETA_ASSETS, "insignias")
+TAMANO_INSIGNIA = (70, 70)
+
+
+def cargar_imagen_insignia(nombre_insignia, tamano=TAMANO_INSIGNIA):
+    """
+    Busca en assets/insignias/ el icono de una insignia por su nombre
+    (ej. "Corazón de la Ciudad" -> corazon_de_la_ciudad.jpg). Devuelve
+    None si no la encuentra, igual que cargar_foto_sitio.
+    """
+    base = _nombre_archivo_sitio(nombre_insignia)
+    for extension in (".jpg", ".jpeg", ".png"):
+        ruta = os.path.join(CARPETA_INSIGNIAS, base + extension)
+        if not os.path.exists(ruta):
+            continue
+        if PIL_DISPONIBLE:
+            imagen = Image.open(ruta)
+            imagen = imagen.resize(tamano, Image.LANCZOS)
+            return ImageTk.PhotoImage(imagen)
+        elif extension == ".png":
+            return tk.PhotoImage(file=ruta)
+    return None
+
 COLOR_FONDO_MENU = "#1E4FA3"
 COLOR_PANEL = "#123166"
 COLOR_TEXTO = "#FFF6E0"
 COLOR_ACENTO = "#FFC700"
+COLOR_PANEL_CLARO = "#D9BE94"      #Cafe claro para paneles sobre el fondo
+COLOR_BOTON = "#C9A66B"            #Cafe claro para botones
+COLOR_BOTON_TEXTO = "#3C2A1E"
 
 PERSONAJES = {
     "rojo":   "Exploradora Roja",
@@ -115,26 +141,29 @@ CONEXIONES_DIBUJO = [
     ("Plaza Grande", "Basílica"), ("La Ronda", "Panecillo"),
 ]
 
-REGLAS_TEXTO = """COMO JUGAR
-
-Empiezas en la Plaza Grande con 80 puntos de energia.
+REGLAS_TEXTO = """CÓMO JUGAR
+Empiezas en la Plaza Grande con 50 puntos de energía.
 
 MOVERTE: haz clic en cualquier sitio conectado directamente al que
-estas ahora. Cada tramo tiene un costo de energia distinto, segun
-que tan lejos este.
+estás ahora. Cada tramo tiene un costo de energía distinto, según
+qué tan lejos esté. Puedes moverte libremente entre cada lugar las veces
+que sean necesarias, OJO al realizar un movimiento siempre, tu energía 
+va a disminuir.
 
 TRIVIA: la primera vez que llegas a un sitio, te hace una pregunta
-de Si/No sobre su historia.
-   - Respuesta correcta: +5 de energia, mas una insignia
-   - Respuesta incorrecta: -4 de energia, sin insignia
+de Sí/No sobre su historia.
+   - Respuesta correcta: +5 de energía, más una insignia
+   - Respuesta incorrecta: -4 de energía, sin insignia
 
-INSIGNIAS: hay 4 niveles de rareza -> comun, rara, epica y legendaria.
+INSIGNIAS: hay 4 niveles de rareza:
+COMÚN -> color gris | 10 puntos
+RARA -> color naranja | 25 puntos
+ÉPICA -> color morado | 50 puntos 
+LEGENDARIA -> color amarillo. | 100 puntos
 Cada una te da puntos distintos para tu puntaje final.
 
-GANAR: llega al Panecillo habiendo visitado los 12 sitios turisticos.
-
-PERDER: si tu energia llega a 0 o menos en cualquier momento."""
-
+GANAR: llega al Panecillo habiendo visitado los 12 sitios turísticos.
+PERDER: si tu energía llega a 0 o menos en cualquier momento."""
 
 # ======================================================================
 # LOS DOS PROCESOS INDEPENDIENTES (multiprocessing)
@@ -188,6 +217,7 @@ class App:
         self.root.title("QuiRuta")
         self.root.configure(bg=COLOR_FONDO_MENU)
         self.root.resizable(False, False)
+        self.root.geometry("900x620")             #Ajusta el tamaño de la ventana
 
         self.imagenes = {}
         self._cargar_imagenes_comunes()
@@ -220,6 +250,7 @@ class App:
     def _limpiar_ventana(self):
         for widget in self.root.winfo_children():
             widget.destroy()
+            self.root.geometry("900x620")
 
     def mostrar_pantalla_inicio(self):
         self._limpiar_ventana()
@@ -245,6 +276,7 @@ class App:
         self.nombre_jugador = nombre
         self.personaje = personaje
         self._limpiar_ventana()
+        self.root.geometry("900x680")
         self.pantalla_juego = PantallaJuego(self.root, self)
 
     def terminar_partida(self, puntaje, resultado, cantidad_visitados, insignias_ganadas):
@@ -255,6 +287,19 @@ class App:
         PantallaFin(self.root, self, puntaje, resultado, insignias_ganadas)
 
 
+def fondo_decorado(root):
+    """Crea un Canvas de 900x620 con la imagen fondo_menu_alegre.png
+    (atardecer colonial) como fondo, para las pantallas de menu, reglas,
+    historial e insignias. La pantalla de juego (el mapa) no usa esto,
+    tiene su propio fondo_mapa.png."""
+    canvas = tk.Canvas(root, width=900, height=620, highlightthickness=0)
+    canvas.pack(fill="both", expand=True)
+
+    imagen_fondo = tk.PhotoImage(file=os.path.join(CARPETA_ASSETS, "fondo_menu_alegre.png"))
+    canvas.imagen_fondo = imagen_fondo          ##referencia viva, evita que se borre de memoria
+    canvas.create_image(0, 0, anchor="nw", image=imagen_fondo)
+
+    return canvas
 # ======================================================================
 # PANTALLA: INICIO (MENU PRINCIPAL)
 # ======================================================================
@@ -262,14 +307,11 @@ class App:
 class PantallaInicio:
     def __init__(self, root, app):
         self.app = app
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
+        canvas = fondo_decorado(root)
 
-        tk.Label(marco, text="QUIRUTA", font=("Georgia", 34, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(70, 5))
-        tk.Label(marco, text="Un recorrido por el Centro Historico de Quito",
-                 font=("Georgia", 13, "italic"), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=(0, 50))
+        canvas.create_text(450, 105, text="QUIRUTA", font=("Georgia", 34, "bold"), fill=COLOR_ACENTO)
+        canvas.create_text(450, 150, text="Un recorrido por el Centro Histórico de Quito",
+                            font=("Georgia", 13, "italic"), fill=COLOR_TEXTO)
 
         botones = [
             ("Iniciar Juego", app.mostrar_pantalla_iniciar_juego),
@@ -277,10 +319,13 @@ class PantallaInicio:
             ("Historial de Juego", app.mostrar_pantalla_historial),
             ("Reglas del Juego", app.mostrar_pantalla_reglas),
         ]
+        y = 230
         for texto, comando in botones:
-            tk.Button(marco, text=texto, font=("Georgia", 14, "bold"), width=26, height=1,
-                      bg=COLOR_PANEL, fg=COLOR_TEXTO, activebackground=COLOR_ACENTO,
-                      relief="flat", bd=0, cursor="hand2", command=comando).pack(pady=8)
+            boton = tk.Button(canvas, text=texto, font=("Georgia", 14, "bold"), width=26, height=1,
+                              bg=COLOR_BOTON, fg=COLOR_BOTON_TEXTO, activebackground=COLOR_ACENTO,  ##CAMBIO
+                              relief="flat", bd=0, cursor="hand2", command=comando)
+            canvas.create_window(450, y, window=boton)
+            y += 48
 
 
 # ======================================================================
@@ -291,46 +336,47 @@ class PantallaIniciarJuego:
     def __init__(self, root, app):
         self.app = app
         self.personaje_elegido = tk.StringVar(value="rojo")
+        canvas = fondo_decorado(root)
 
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
+        panel = tk.Frame(canvas, bg=COLOR_PANEL_CLARO)
+        tk.Label(panel, text="Antes de empezar...", font=("Georgia", 22, "bold"),
+                 bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=(20, 15))
 
-        tk.Label(marco, text="Antes de empezar...", font=("Georgia", 24, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(50, 30))
-
-        tk.Label(marco, text="Tu nombre:", font=("Georgia", 13), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack()
-        self.entrada_nombre = tk.Entry(marco, font=("Georgia", 13), justify="center", width=25)
-        self.entrada_nombre.pack(pady=(5, 30))
+        tk.Label(panel, text="Tu nombre:", font=("Georgia", 13),
+                 bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack()
+        self.entrada_nombre = tk.Entry(panel, font=("Georgia", 13), justify="center", width=25)
+        self.entrada_nombre.pack(pady=(5, 20))
         self.entrada_nombre.focus()
 
-        tk.Label(marco, text="Elige tu personaje:", font=("Georgia", 13),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=(0, 10))
+        tk.Label(panel, text="Elige tu personaje:", font=("Georgia", 13),
+                 bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=(0, 8))
 
-        marco_personajes = tk.Frame(marco, bg=COLOR_FONDO_MENU)
+        marco_personajes = tk.Frame(panel, bg=COLOR_PANEL_CLARO)
         marco_personajes.pack(pady=5)
         for clave, etiqueta in PERSONAJES.items():
-            sub = tk.Frame(marco_personajes, bg=COLOR_FONDO_MENU)
+            sub = tk.Frame(marco_personajes, bg=COLOR_PANEL_CLARO)
             sub.pack(side="left", padx=15)
-            boton_img = tk.Radiobutton(sub, image=app.imagenes["pin_" + clave], variable=self.personaje_elegido,
-                                        value=clave, indicatoron=False, bg=COLOR_FONDO_MENU,
-                                        selectcolor=COLOR_ACENTO, bd=2, cursor="hand2")
-            boton_img.pack()
-            tk.Label(sub, text=etiqueta, font=("Georgia", 9), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack()
+            tk.Radiobutton(sub, image=app.imagenes["pin_" + clave], variable=self.personaje_elegido,
+                            value=clave, indicatoron=False, bg=COLOR_PANEL_CLARO,
+                            selectcolor=COLOR_ACENTO, bd=2, cursor="hand2").pack()
+            tk.Label(sub, text=etiqueta, font=("Georgia", 9),
+                     bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack()
 
-        tk.Button(marco, text="Comenzar Recorrido", font=("Georgia", 14, "bold"), width=22,
-                  bg=COLOR_ACENTO, fg="#123166", relief="flat", cursor="hand2",
-                  command=self._comenzar).pack(pady=40)
+        tk.Button(panel, text="Comenzar Recorrido", font=("Georgia", 14, "bold"), width=22,
+                  bg=COLOR_ACENTO, fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2",
+                  command=self._comenzar).pack(pady=(25, 8))
 
-        tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
-                  relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack()
+        tk.Button(panel, text="< Volver al menú", font=("Georgia", 10), bg=COLOR_PANEL_CLARO,
+                  fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2",
+                  command=app.mostrar_pantalla_inicio).pack(pady=(0, 15))
+
+        canvas.create_window(450, 310, window=panel)   ##sin width/height fijos: se ajusta solo al contenido
 
     def _comenzar(self):
         nombre = self.entrada_nombre.get().strip()
-        if not nombre:  ##NUEVO: valida que no este vacio
+        if not nombre:
             messagebox.showwarning("Nombre requerido", "Por favor ingresa tu nombre antes de comenzar.")
-            return  ##corta aqui, no avanza a la partida
-
+            return
         self.app.iniciar_partida(nombre, self.personaje_elegido.get())
 
 # ======================================================================
@@ -340,27 +386,26 @@ class PantallaIniciarJuego:
 class PantallaInsignias:
     def __init__(self, root, app):
         self.app = app
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
+        self.canvas = fondo_decorado(root)
 
-        tk.Label(marco, text="Insignias Coleccionadas", font=("Georgia", 24, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(30, 10))
+        self.canvas.create_text(450, 45, text="Insignias Coleccionadas",
+                                 font=("Georgia", 24, "bold"), fill=COLOR_ACENTO)
 
-        fila_busqueda = tk.Frame(marco, bg=COLOR_FONDO_MENU)
-        fila_busqueda.pack(pady=10)
+        fila_busqueda = tk.Frame(self.canvas, bg=COLOR_PANEL_CLARO)
         tk.Label(fila_busqueda, text="Nombre del jugador:", font=("Georgia", 12),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(side="left", padx=5)
+                 bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(side="left", padx=8, pady=8)
         self.entrada = tk.Entry(fila_busqueda, font=("Georgia", 12), width=20)
         self.entrada.pack(side="left", padx=5)
-        tk.Button(fila_busqueda, text="Buscar", command=self._buscar, bg=COLOR_PANEL,
-                  fg=COLOR_TEXTO, relief="flat", cursor="hand2").pack(side="left", padx=5)
+        tk.Button(fila_busqueda, text="Buscar", command=self._buscar, bg=COLOR_BOTON,
+                  fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2").pack(side="left", padx=8)
+        self.canvas.create_window(450, 90, window=fila_busqueda)
 
-        self.lienzo_resultado = tk.Frame(marco, bg=COLOR_FONDO_MENU)
-        self.lienzo_resultado.pack(pady=15, fill="both", expand=True)
+        self.lienzo_resultado = tk.Frame(self.canvas, bg=COLOR_PANEL_CLARO)
+        self.ventana_resultado = self.canvas.create_window(450, 350, window=self.lienzo_resultado)
 
-        tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
-                  relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack(pady=10)
+        boton = tk.Button(self.canvas, text="< Volver al menú", font=("Georgia", 10), bg=COLOR_PANEL_CLARO,
+                           fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio)
+        self.canvas.create_window(450, 600, window=boton)
 
     def _buscar(self):
         for w in self.lienzo_resultado.winfo_children():
@@ -370,20 +415,25 @@ class PantallaInsignias:
             return
         insignias = persistencia.cargar_insignias(nombre)
         if not insignias:
-            tk.Label(self.lienzo_resultado, text=f"{nombre} todavia no tiene insignias.",
-                     font=("Georgia", 12, "italic"), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=20)
+            tk.Label(self.lienzo_resultado, text=f"{nombre} todavía no tiene insignias.",
+                     font=("Georgia", 12, "italic"), bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=20, padx=40)
             return
 
         colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": COLOR_ACENTO}
-        contenedor = tk.Frame(self.lienzo_resultado, bg=COLOR_FONDO_MENU)
-        contenedor.pack()
+        self.iconos_insignias = []
         for i, ins in enumerate(insignias):
             color = colores_rareza.get(ins["rareza"], "#95A5A6")
-            tarjeta = tk.Frame(contenedor, bg=color, width=180, height=70, relief="raised", bd=2)
+            tarjeta = tk.Frame(self.lienzo_resultado, bg=color, width=180, height=100, relief="raised", bd=2)
             tarjeta.grid(row=i // 4, column=i % 4, padx=8, pady=8)
             tarjeta.pack_propagate(False)
+
+            icono = cargar_imagen_insignia(ins["nombre"])
+            if icono is not None:
+                self.iconos_insignias.append(icono)
+                tk.Label(tarjeta, image=icono, bg=color).pack(pady=(6, 0))
+
             tk.Label(tarjeta, text=ins["nombre"], font=("Georgia", 10, "bold"),
-                     bg=color, fg="white", wraplength=160).pack(pady=(8, 0))
+                     bg=color, fg="white", wraplength=160).pack(pady=(4, 0))
             tk.Label(tarjeta, text=ins["rareza"].capitalize(), font=("Georgia", 9, "italic"),
                      bg=color, fg="white").pack()
 
@@ -395,24 +445,23 @@ class PantallaInsignias:
 class PantallaHistorial:
     def __init__(self, root, app):
         self.app = app
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
+        canvas = fondo_decorado(root)
+        canvas.create_text(450, 45, text="Top 5 Mejores Puntajes",
+                            font=("Georgia", 22, "bold"), fill=COLOR_ACENTO)
 
-        tk.Label(marco, text="Top 5 Mejores Puntajes", font=("Georgia", 22, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(15, 10))
+        marco = tk.Frame(canvas, bg=COLOR_PANEL_CLARO)
 
         estilo = ttk.Style()
         estilo.theme_use("clam")
         estilo.configure("Historial.Treeview",
-                          background=COLOR_PANEL, foreground=COLOR_TEXTO,
-                          fieldbackground=COLOR_PANEL, rowheight=42,
+                          background=COLOR_PANEL_CLARO, foreground=COLOR_BOTON_TEXTO,    ##CAMBIO
+                          fieldbackground=COLOR_PANEL_CLARO, rowheight=42,               ##CAMBIO
                           font=("Georgia", 12), borderwidth=0)
         estilo.configure("Historial.Treeview.Heading",
-                          background=COLOR_ACENTO, foreground=COLOR_FONDO_MENU,
+                          background=COLOR_ACENTO, foreground=COLOR_BOTON_TEXTO,
                           font=("Georgia", 13, "bold"), borderwidth=0)
         estilo.map("Historial.Treeview", background=[("selected", COLOR_ACENTO)],
-                   foreground=[("selected", COLOR_FONDO_MENU)])
+                   foreground=[("selected", COLOR_BOTON_TEXTO)])
 
         columnas = ("puesto", "nombre", "personaje", "puntaje", "resultado", "sitios", "fecha")
         tabla = ttk.Treeview(marco, columns=columnas, show="headings",
@@ -425,10 +474,10 @@ class PantallaHistorial:
             tabla.heading(col, text=encabezados[col])
             tabla.column(col, width=anchos[col], anchor="center")
 
-        tabla.tag_configure("oro", foreground="#FFD966")
-        tabla.tag_configure("plata", foreground="#D9D9D9")
-        tabla.tag_configure("bronce", foreground="#D08A4C")
-        tabla.tag_configure("normal", foreground=COLOR_TEXTO)
+        tabla.tag_configure("oro", foreground="#B8860B")
+        tabla.tag_configure("plata", foreground="#6E6E6E")
+        tabla.tag_configure("bronce", foreground="#A0522D")
+        tabla.tag_configure("normal", foreground=COLOR_BOTON_TEXTO)
 
         medallas = {0: "🥇", 1: "🥈", 2: "🥉"}
         etiquetas = {0: "oro", 1: "plata", 2: "bronce"}
@@ -436,18 +485,20 @@ class PantallaHistorial:
         mejores = persistencia.cargar_mejores_partidas(5)
         if not mejores:
             tk.Label(marco, text="Aún no hay partidas registradas.", font=("Georgia", 13, "italic"),
-                     bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=40)
+                     bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=40, padx=60)
         else:
             for i, partida in enumerate(mejores):
                 puesto = medallas.get(i, str(i + 1))
                 tabla.insert("", "end", tags=(etiquetas.get(i, "normal"),), values=(
                     puesto, partida["nombre"], PERSONAJES.get(partida["personaje"], partida["personaje"]),
                     partida["puntaje"], partida["resultado"], partida["sitios_visitados"], partida["fecha"]))
+            tabla.pack(padx=15, pady=15)
 
-        tabla.pack(padx=15, pady=10, fill="both", expand=True)
+        canvas.create_window(450, 340, window=marco)
 
-        tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
-                  relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack(pady=10)
+        boton = tk.Button(canvas, text="< Volver al menú", font=("Georgia", 10), bg=COLOR_PANEL_CLARO,
+                           fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio)
+        canvas.create_window(450, 600, window=boton)
 
 # ======================================================================
 # PANTALLA: REGLAS
@@ -455,20 +506,17 @@ class PantallaHistorial:
 
 class PantallaReglas:
     def __init__(self, root, app):
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
+        canvas = fondo_decorado(root)
+        canvas.create_text(450, 45, text="Reglas del Juego", font=("Georgia", 24, "bold"), fill=COLOR_ACENTO)
 
-        tk.Label(marco, text="Reglas del Juego", font=("Georgia", 24, "bold"),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_ACENTO).pack(pady=(30, 15))
+        panel = tk.Frame(canvas, bg=COLOR_PANEL_CLARO)
+        tk.Label(panel, text=REGLAS_TEXTO, font=("Georgia", 12), bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO,
+                 justify="left", anchor="nw", wraplength=760).pack(padx=25, pady=25)
+        canvas.create_window(450, 340, window=panel, width=800, height=470)
 
-        panel = tk.Frame(marco, bg=COLOR_PANEL)
-        panel.pack(padx=60, pady=10, fill="both", expand=True)
-        tk.Label(panel, text=REGLAS_TEXTO, font=("Georgia", 12), bg=COLOR_PANEL, fg=COLOR_TEXTO,
-                 justify="left", anchor="nw").pack(padx=25, pady=25, fill="both", expand=True)
-
-        tk.Button(marco, text="< Volver al menu", font=("Georgia", 10), bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO,
-                  relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio).pack(pady=10)
+        boton = tk.Button(canvas, text="< Volver al menú", font=("Georgia", 10), bg=COLOR_PANEL_CLARO,
+                           fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2", command=app.mostrar_pantalla_inicio)
+        canvas.create_window(450, 600, window=boton)
 
 
 # ======================================================================
@@ -479,25 +527,20 @@ class PantallaFin:
     def __init__(self, root, app, puntaje, resultado, insignias):
         self.app = app
         gano = (resultado == "victoria")
+        canvas = fondo_decorado(root)
 
-        marco = tk.Frame(root, bg=COLOR_FONDO_MENU, width=900, height=620)
-        marco.pack(fill="both", expand=True)
-        marco.pack_propagate(False)
-
-        titulo = "Recorriste todo el Centro Historico!" if gano else "Te quedaste sin energia"
+        titulo = "¡Recorriste todo el Centro Histórico!" if gano else "Te quedaste sin energía"
         color_titulo = COLOR_ACENTO if gano else "#E63946"
-        tk.Label(marco, text=titulo, font=("Georgia", 22, "bold"), bg=COLOR_FONDO_MENU,
-                 fg=color_titulo, wraplength=700).pack(pady=(50, 10))
+        canvas.create_text(450, 60, text=titulo, font=("Georgia", 20, "bold"), fill=color_titulo, width=700)
+        canvas.create_text(450, 105, text=f"Puntaje final: {puntaje}", font=("Georgia", 16), fill=COLOR_TEXTO)
 
-        tk.Label(marco, text=f"Puntaje final: {puntaje}", font=("Georgia", 16),
-                 bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=10)
-
+        panel = tk.Frame(canvas, bg=COLOR_PANEL_CLARO)
         if insignias:
-            tk.Label(marco, text="Insignias ganadas en esta partida:", font=("Georgia", 12, "italic"),
-                     bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=(20, 5))
+            tk.Label(panel, text="Insignias ganadas en esta partida:", font=("Georgia", 12, "italic"),
+                     bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=(15, 10))
             colores_rareza = {"común": "#95A5A6", "rara": "#3498DB", "épica": "#9B59B6", "legendaria": COLOR_ACENTO}
-            contenedor = tk.Frame(marco, bg=COLOR_FONDO_MENU)
-            contenedor.pack(pady=5)
+            contenedor = tk.Frame(panel, bg=COLOR_PANEL_CLARO)
+            contenedor.pack(pady=5, padx=15)
             for i, ins in enumerate(insignias):
                 color = colores_rareza.get(ins["rareza"], "#95A5A6")
                 tarjeta = tk.Frame(contenedor, bg=color, width=160, height=60)
@@ -506,17 +549,21 @@ class PantallaFin:
                 tk.Label(tarjeta, text=ins["nombre"], font=("Georgia", 9, "bold"), bg=color,
                          fg="white", wraplength=145).pack(expand=True)
         else:
-            tk.Label(marco, text="No ganaste insignias esta vez.", font=("Georgia", 11, "italic"),
-                     bg=COLOR_FONDO_MENU, fg=COLOR_TEXTO).pack(pady=20)
+            tk.Label(panel, text="No ganaste insignias esta vez.", font=("Georgia", 11, "italic"),
+                     bg=COLOR_PANEL_CLARO, fg=COLOR_BOTON_TEXTO).pack(pady=20, padx=40)
+        canvas.create_window(450, 280, window=panel)
 
-        marco_botones = tk.Frame(marco, bg=COLOR_FONDO_MENU)
-        marco_botones.pack(pady=40)
-        tk.Button(marco_botones, text="Jugar de nuevo", font=("Georgia", 13, "bold"), width=16,
-                  bg=COLOR_ACENTO, fg="#123166", relief="flat", cursor="hand2",
-                  command=lambda: app.iniciar_partida(app.nombre_jugador, app.personaje)).pack(side="left", padx=10)
-        tk.Button(marco_botones, text="Volver al menu", font=("Georgia", 13, "bold"), width=16,
-                  bg=COLOR_PANEL, fg=COLOR_TEXTO, relief="flat", cursor="hand2",
-                  command=app.mostrar_pantalla_inicio).pack(side="left", padx=10)
+        boton_jugar = tk.Button(canvas, text="Jugar de nuevo", font=("Georgia", 13, "bold"), width=16,
+                                bg=COLOR_ACENTO, fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2",
+                                bd=0, highlightthickness=0,
+                                command=lambda: app.iniciar_partida(app.nombre_jugador, app.personaje))
+        canvas.create_window(345, 560, window=boton_jugar)
+
+        boton_menu = tk.Button(canvas, text="Volver al menú", font=("Georgia", 13, "bold"), width=16,
+                               bg=COLOR_BOTON, fg=COLOR_BOTON_TEXTO, relief="flat", cursor="hand2",
+                               bd=0, highlightthickness=0,
+                               command=app.mostrar_pantalla_inicio)
+        canvas.create_window(555, 560, window=boton_menu)
 
 
 # ======================================================================
@@ -553,7 +600,7 @@ class PantallaJuego:
         barra.pack(fill="x")
         tk.Label(barra, text=app.nombre_jugador, font=("Georgia", 13, "bold"),
                  bg=COLOR_PANEL, fg=COLOR_ACENTO).pack(side="left", padx=20, pady=8)
-        self.label_energia = tk.Label(barra, text="Energia: " + str(self.energia),
+        self.label_energia = tk.Label(barra, text="Energía: " + str(self.energia),
                                        font=("Georgia", 14, "bold"), bg=COLOR_PANEL, fg=COLOR_TEXTO)
         self.label_energia.pack(side="left", padx=25, pady=8)
         self.label_puntaje = tk.Label(barra, text="Puntaje: " + str(self.puntaje_total),
@@ -686,7 +733,7 @@ class PantallaJuego:
         if mensaje["tipo"] == "mover":
             resultado = mensaje["resultado"]
             if not resultado["exito"]:
-                messagebox.showinfo("Movimiento invalido", "Esos dos sitios no estan conectados.")
+                messagebox.showinfo("Movimiento inválido", "Esos dos sitios no estan conectados.")
                 return
 
             origen = POSICIONES[self.nodo_actual]
@@ -769,7 +816,7 @@ class PantallaJuego:
         """
         Muestra el resultado de la trivia (acierto/error + insignia) junto
         con una foto real del sitio que se acaba de visitar. El juego
-        queda "en pausa" -- no se descuenta/suma energia ni se revisa
+        queda "en pausa" -- no se descuenta/suma energía ni se revisa
         victoria/derrota -- hasta que el jugador presiona "Continuar".
         """
         acierto = resultado["resultado"] == "correcta"
@@ -807,9 +854,15 @@ class PantallaJuego:
                  bg=COLOR_PANEL, fg=COLOR_TEXTO).pack()
 
         if resultado["insignia"]:
+            icono_insignia = cargar_imagen_insignia(resultado["insignia"]["nombre"])
+            if icono_insignia is not None:
+                self._icono_insignia_actual = icono_insignia  # referencia viva
+                tk.Label(ventana, image=icono_insignia, bg=COLOR_PANEL).pack(pady=(4, 0))
             tk.Label(ventana,
                      text=f"Insignia obtenida: {resultado['insignia']['nombre']} ({resultado['insignia']['rareza']})",
                      font=("Georgia", 11, "bold"), bg=COLOR_PANEL, fg=COLOR_ACENTO).pack(pady=(2, 0))
+            tk.Label(ventana, text=f"Puntaje obtenido: {resultado['puntos']} puntos. ¡Sigue adelante!",  ##NUEVO
+                     font=("Georgia", 10, "italic"), bg=COLOR_PANEL, fg=COLOR_TEXTO).pack(pady=(2, 0))
         else:
             tk.Label(ventana, text="No obtuviste insignia esta vez.", font=("Georgia", 10, "italic"),
                      bg=COLOR_PANEL, fg=COLOR_TEXTO).pack(pady=(2, 0))
